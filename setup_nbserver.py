@@ -25,11 +25,11 @@ with open(home_dir+"/.ipython/profile_nbserver/ipython_notebook_config.py", "w")
     cf.write(config_str)
         
 
-os.system("sudo printf \"\nexport PATH=/usr/local/cuda/bin:$PATH\nexport LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH\n\" >> /root/.bashrc")
-os.system("sudo printf \"\nshell -/bin/bash\n\" >> /root/.screenrc")
+#os.system("sudo printf \"\nexport PATH=/usr/local/cuda/bin:$PATH\nexport LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH\n\" >> /root/.bashrc")
+#os.system("sudo printf \"\nshell -/bin/bash\n\" >> /root/.screenrc")
 
 # this is usually make some error... do not use this!
-os.system("screen -dRR -dmS ipython_notebook ipython notebook --profile=nbserver;")
+#os.system("screen -dRR -dmS ipython_notebook ipython notebook --profile=nbserver;")
 
 # https://www.gnu.org/software/screen/manual/screen.html
 # screen install check
