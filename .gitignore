@@ -1,3 +1,6 @@
 *.swp
 *.pyc
 .ipynb_checkpoints
+*.tar.gz
+*.csv
+
