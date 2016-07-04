@@ -4,3 +4,5 @@ This repository consists of IPython notebooks of basic and advanced examples of 
 ## MNIST data
 MNIST data is not ours. You can find the license info and the original data uploads here: http://yann.lecun.com/exdb/mnist/
 
+## Extra materials
+https://github.com/nzer0/theano\_short\_demo/
