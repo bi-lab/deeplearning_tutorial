@@ -1,0 +1,1713 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#TensorFlow Tutorial\n",
+    "\n",
+    "본 문서는 TensorFlow 를 사용하여 Deep Learning을 구현하기 위한 기초적인 실습 자료이다. 첫 번째 파트에서는 tensorflow에 대한 기본적인 설명과 deep learning 예제를 다루어보고, 두 번째 파트에서는 오픈소스를 활용한 Deep Reinforcement Learning 을 실습해보는 시간을 갖는다. 마지막으로 세 번째 파트에서는 주어진 데이터를 가장 잘 fitting 할 수 있는 regression 모델을 직접 작성해본다.\n",
+    "\n",
+    "The code and comments are written by Dong-Hyun Kwak (imcomking@gmail.com)\n",
+    "\n",
+    "<a rel=\"license\" href=\"http://creativecommons.org/licenses/by-nc-sa/4.0/\"><img alt=\"Creative Commons License\" style=\"border-width:0\" src=\"https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png\" /></a><br />This work is licensed under a <a rel=\"license\" href=\"http://creativecommons.org/licenses/by-nc-sa/4.0/\">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Part 1. TensorFlow\n",
+    "\n",
+    "TensorFlow 이하, tf는 구글 주도하에 초기 개발되고, 현재 오픈소스로 공개되어 널리 쓰이고 있는 분산 기계학습(딥러닝)을 위한 라이브러리이다. Computation Graph를 사용한 Theano의 장점을 그대로 살려 automatic gradient 계산이 가능하고, Spark처럼 분산 클라우드 컴퓨팅 환경에서 동작하기 위한 아키텍처로 설계되었다. 그리고 당연히 GPU와 CPU 연산 모두 지원한다.\n",
+    "\n",
+    "Computation Graph는 tf를 이해하는 데 가장 중요한 핵심이다. 말그대로 어떤 모델을 우리가 코딩하게 되면, 이 모델의 계산 과정이 일련의 node와 edge들로 연결된 graph를 이루게 되는데 이것이 바로 Computation Graph이다.\n",
+    "\n",
+    "그래서 성공적으로 모델을 작성하게 되면 아래와 같은 Computation Graph(MLP의 feedforward 연산과정)가 만들어 진다."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src = \"tensorboard_mlp.png\">"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "우선 기본적인 tf의 문법과 형식을 익히기 위해, 가장 기본적인 Deep Learning인 MLP 예제 코드를 실습해보자.\n",
+    "\n",
+    "### Multi-Layer Perceptron\n",
+    "Multi-Layer Perceptron, 이하 MLP는 다음과 같은 구조를 가진 모델이다. Convolutional Neural Networks와 달리 굉장히 layer간의 연결이 빽빽하게 가득 차 있어, dense layer 혹은 fully connected layer라는 이름으로도 불리고 있다.\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src = \"mlp.png\">\n",
+    "(출처: http://blog.refu.co/?p=931)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "tf를 이용해서 MNIST 데이터를 MLP로 분류하는 코드를 작성해보자.\n",
+    "가장 먼저 사용할 라이브러리를 import 해준다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "0.8.0\n"
+     ]
+    }
+   ],
+   "source": [
+    "%matplotlib inline\n",
+    "import tensorflow as tf\n",
+    "from tensorflow.examples.tutorials.mnist import input_data\n",
+    "print (tf.__version__)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "그리고 실습에서 사용할 MNIST 데이터를 다음과 같이 다운로드 받는다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Extracting MNIST_data/train-images-idx3-ubyte.gz\n",
+      "Extracting MNIST_data/train-labels-idx1-ubyte.gz\n",
+      "Extracting MNIST_data/t10k-images-idx3-ubyte.gz\n",
+      "Extracting MNIST_data/t10k-labels-idx1-ubyte.gz\n"
+     ]
+    }
+   ],
+   "source": [
+    "# download the mnist data.\n",
+    "mnist = input_data.read_data_sets('MNIST_data', one_hot=True)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "이제 mnist 데이터를 저장시킬 x와 y_target 변수를 선언해야한다.\n",
+    "tf.placeholder는 우리가 원하는 데이터를 Computation Graph에 입력시켜주는 역할을 하는 변수이다. 즉 input 을 받기 위한 변수라고 생각할 수 있다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# placeholder is used for feeding data.\n",
+    "x = tf.placeholder(\"float\", shape=[None, 784]) # none represents variable length of dimension. 784 is the dimension of MNIST data.\n",
+    "y_target = tf.placeholder(\"float\", shape=[None, 10]) # shape argument is optional, but this is useful to debug."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "데이터를 넣을 변수를 생성했으니, 이제 실제 Neural Network에서 사용할 변수들을 생성하고, 이들을 이용해 Computation Graph를 그려본다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "# all the variables are allocated in GPU memory\n",
+    "W1 = tf.Variable(tf.zeros([784, 256]))      # create (784 * 256) matrix\n",
+    "b1 = tf.Variable(tf.zeros([256]))           # create (1 * 256) vector\n",
+    "weighted_summation1 = tf.matmul(x, W1) + b1 # compute --> weighted summation\n",
+    "h1 = tf.sigmoid( weighted_summation1 )      # compute --> sigmoid(weighted summation)\n",
+    "\n",
+    "# Repeat again\n",
+    "W2 = tf.Variable(tf.zeros([256, 10]))        # create (256 * 10) matrix\n",
+    "b2 = tf.Variable(tf.zeros([10]))             # create (1 * 10) vector\n",
+    "weighted_summation2 = tf.matmul(h1, W2) + b2 # compute --> weighted summation\n",
+    "y = tf.nn.softmax(weighted_summation2)       # compute classification --> softmax(weighted summation)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "위의 과정까지 완료된 경우, 변수 y는 3층짜리 Neural Network(MLP)의 연산 결과가 저장되도록 되어있다. 이제 이 MLP를 학습하고 실행시켜보자.\n",
+    "\n",
+    "먼저 tf에는 Session이라는 개념이 있다. 이는 간단히 말해 하나의 Computation Graph가 실행되기 위한 계산 단위를 의미한다. 즉 하나의 session에는 보통 하나의 graph가 담겨있다. 이를 생성해보자."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "#with tf.Graph().as_default():\n",
+    "sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth =True))) # open a session which is a envrionment of computation graph.\n",
+    "sess.run(tf.initialize_all_variables())# initialize the variables"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "위의 tf.initialize_all_variables() 는 앞서 생성했던 변수들을 사용하기 위해서 반드시 실행해야하는 초기화 단계이다. 이 연산은 session에 의해서 실행되므로, 이와 같이 sess.run() 함수를 이용해 실행시켜준다.\n",
+    "\n",
+    "이제 MLP를 학습시키기 위한 미분 계산과 같은 수학적인 연산들을 정의해보자."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# define the Loss function\n",
+    "cross_entropy = -tf.reduce_sum(y_target*tf.log(y))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "cross entorpy는 MLP의 분류 모델에서 사용하는 에러함수이다. 간단히 말해 이 cross entropy는 MLP가 예측한 y 값이 실제 데이터와 다른 정도를 확률적으로 측정한다고 생각해볼 수 있다.\n",
+    "\n",
+    "MLP가 학습 되기위해서는 이 에러함수가 최대한 작은 값을 내도록 만들어야한다. 그래서 이 에러함수를 각각의 변수들로 편미분하여 gradient를 계산하고, 에러가 최소가 되는 변수값을 찾아가는 것이 바로 MLP의 학습 알고리즘이다.\n",
+    "\n",
+    "이를 구현하려면 원래 미분 후 에러가 줄어드는 방향으로 변수를 이동시키는 과정등을 직접 코딩해야하지만, 자동 미분을 제공하는 tf에서는 단 한줄로 구현할 수 있다.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# define optimization algorithm\n",
+    "train_step = tf.train.GradientDescentOptimizer(0.01).minimize(cross_entropy)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "이제 학습 알고리즘의 구현이 끝났고, MLP가 잘 학습하고 있는지 성능을 측정하기 위한 정확도 계산을 정의해보자."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_target, 1))\n",
+    "# correct_prediction is list of boolean which is the result of comparing(model prediction , data)\n",
+    "\n",
+    "accuracy = tf.reduce_mean(tf.cast(correct_prediction, \"float\")) \n",
+    "# tf.cast() : changes true -> 1 / false -> 0\n",
+    "# tf.reduce_mean() : calculate the mean"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "correct_prediction 는 뭔가 수식이 복잡해 보이지만 사실 매우 간단한 계산이다. tf.argmax()는 y 벡터 중에서 가장 값이 큰 index를 알려주는 함수이다. 즉 모델이 예측한 class, y와 실제 데이터에 labeling된 y_target을 비교하여 같으면 true, 다르면 false를 내도록 계산한 것이다.\n",
+    "\n",
+    "그리고 accuracy는 앞서 계산한 true/false 리스트를 1과 0으로 변환한 뒤, 이를 평균낸 것이다.\n",
+    "\n",
+    "자 그러면 이제 필요한 모든 Computation Graph를 정의하였다. 이제 이를 session을 이용하여 실행만 시키면 된다.\n",
+    "\n",
+    "\n",
+    "우선은 Ctrl + Enter를 눌러 다음 코드를 실행 시켜보자."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "step 0, training accuracy: 0.120\n",
+      "step 500, training accuracy: 0.530\n",
+      "step 1000, training accuracy: 0.780\n",
+      "step 1500, training accuracy: 0.910\n",
+      "step 2000, training accuracy: 0.910\n",
+      "step 2500, training accuracy: 0.950\n",
+      "step 3000, training accuracy: 0.890\n",
+      "step 3500, training accuracy: 0.940\n",
+      "step 4000, training accuracy: 0.930\n",
+      "step 4500, training accuracy: 0.970\n",
+      "step 5000, training accuracy: 0.950\n",
+      "test accuracy: 0.9312\n"
+     ]
+    }
+   ],
+   "source": [
+    "# training the MLP\n",
+    "for i in range(5001): # minibatch iteraction\n",
+    "    batch = mnist.train.next_batch(100) # minibatch size\n",
+    "    sess.run(train_step, feed_dict={x: batch[0], y_target: batch[1]}) # feed data into placeholder x, y_target\n",
+    "\n",
+    "    if i%500 == 0:\n",
+    "        train_accuracy = sess.run(accuracy, feed_dict={x:batch[0], y_target: batch[1]})\n",
+    "        print \"step %d, training accuracy: %.3f\"%(i, train_accuracy)\n",
+    "\n",
+    "# for given x, y_target data set\n",
+    "print  \"test accuracy: %g\"% sess.run(accuracy, feed_dict={x: mnist.test.images, y_target: mnist.test.labels})\n",
+    "sess.close()\n",
+    "tf.reset_default_graph()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "총 5000번의 minibatch iteraction을 실행하고, 500번 마다 학습 정확도를 측정, 그리고 마지막에는 테스트 정확도를 측정하고 있다.\n",
+    "\n",
+    "코드는 간단한 구조이다. for 문이 전체 iteration을 실행하고, 맨 처음 가져왔던 mnist 데이터를 100개씩 가져와서 place_holder에 넣어준다. 그리고 sess.run()을 통해 위에서 정의했던 학습 알고리즘과 정확도 계산을 실행시킨다."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "이제 우리가 만든 MLP의 구조를 직접 눈으로 확인해보자.\n",
+    "\n",
+    "### TensorBoard 설정하기\n",
+    "TensorFlow는 TensorBoard라는 매우 강력한 visualization tool을 제공한다. 이를 사용하면 웹브라우저 형태로 사용자가 모델의 구조를 눈으로 확인하고, 파라미터 값의 변화를 살펴보는 등의 직관적인 분석이 가능하다.\n",
+    "\n",
+    "이를 활용해 방금 만들었던 MLP를 분석해보자. 그러려면 다음의 사항을 반영해 코드를 수정하여야 한다.\n",
+    "\n",
+    "* **변수들의 이름 지어주기**\n",
+    "\n",
+    "* **변수들의 Summary 생성**\n",
+    "\n",
+    "* **변수들의 Summary 기록**\n",
+    "\n",
+    "아래의 코드는 위의 3가지 사항을 모두 반영하고, MLP 코드를 하나의 함수로 정리한 코드이다. 세세한 차이는 위에서 우리가 짰던 코드와 비교를 하면 파악이 가능하다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Extracting MNIST_data/train-images-idx3-ubyte.gz\n",
+      "Extracting MNIST_data/train-labels-idx1-ubyte.gz\n",
+      "Extracting MNIST_data/t10k-images-idx3-ubyte.gz\n",
+      "Extracting MNIST_data/t10k-labels-idx1-ubyte.gz\n",
+      "step 0, training accuracy: 0.120\n",
+      "step 500, training accuracy: 0.370\n",
+      "step 1000, training accuracy: 0.410\n",
+      "step 1500, training accuracy: 0.370\n",
+      "step 2000, training accuracy: 0.680\n",
+      "step 2500, training accuracy: 0.750\n",
+      "step 3000, training accuracy: 0.840\n",
+      "step 3500, training accuracy: 0.870\n",
+      "step 4000, training accuracy: 0.920\n",
+      "step 4500, training accuracy: 0.900\n",
+      "step 5000, training accuracy: 0.900\n",
+      "test accuracy: 0.9042\n"
+     ]
+    }
+   ],
+   "source": [
+    "%matplotlib inline\n",
+    "import tensorflow as tf\n",
+    "from tensorflow.examples.tutorials.mnist import input_data\n",
+    "\n",
+    "tf.reset_default_graph()\n",
+    "\n",
+    "def MLP():\n",
+    "    # download the mnist data.\n",
+    "    mnist = input_data.read_data_sets('MNIST_data', one_hot=True) \n",
+    "\n",
+    "\n",
+    "    # placeholder is used for feeding data.\n",
+    "    x = tf.placeholder(\"float\", shape=[None, 784], name = 'x') # none represents variable length of dimension. 784 is the dimension of MNIST data.\n",
+    "    y_target = tf.placeholder(\"float\", shape=[None, 10], name = 'y_target') # shape argument is optional, but this is useful to debug.\n",
+    "\n",
+    "\n",
+    "    # all the variables are allocated in GPU memory\n",
+    "    W1 = tf.Variable(tf.zeros([784, 256]), name = 'W1')   # create (784 * 256) matrix\n",
+    "    b1 = tf.Variable(tf.zeros([256]), name = 'b1')        # create (1 * 256) vector\n",
+    "    h1 = tf.sigmoid(tf.matmul(x, W1) + b1, name = 'h1')   # compute --> sigmoid(weighted summation)\n",
+    "\n",
+    "    # Repeat again\n",
+    "    W2 = tf.Variable(tf.zeros([256, 10]), name = 'W2')     # create (256 * 10) matrix\n",
+    "    b2 = tf.Variable(tf.zeros([10]), name = 'b2')          # create (1 * 10) vector\n",
+    "    y = tf.nn.softmax(tf.matmul(h1, W2) + b2, name = 'y')  # compute classification --> softmax(weighted summation)\n",
+    "\n",
+    "\n",
+    "    # define the Loss function\n",
+    "    cross_entropy = -tf.reduce_sum(y_target*tf.log(y), name = 'cross_entropy')\n",
+    "\n",
+    "\n",
+    "    # define optimization algorithm\n",
+    "    train_step = tf.train.GradientDescentOptimizer(0.01).minimize(cross_entropy)\n",
+    "\n",
+    "\n",
+    "\n",
+    "    correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_target, 1))\n",
+    "    # correct_prediction is list of boolean which is the result of comparing(model prediction , data)\n",
+    "\n",
+    "\n",
+    "    accuracy = tf.reduce_mean(tf.cast(correct_prediction, \"float\")) \n",
+    "    # tf.cast() : changes true -> 1 / false -> 0\n",
+    "    # tf.reduce_mean() : calculate the mean\n",
+    "\n",
+    "\n",
+    "\n",
+    "    # create summary of parameters\n",
+    "    tf.histogram_summary('weights_1', W1)\n",
+    "    tf.histogram_summary('weights_2', W2)\n",
+    "    tf.histogram_summary('y', y)\n",
+    "    tf.scalar_summary('cross_entropy', cross_entropy)\n",
+    "    merged = tf.merge_all_summaries()\n",
+    "    summary_writer = tf.train.SummaryWriter(\"/tmp/mlp\")\n",
+    "\n",
+    "\n",
+    "    # Create Session\n",
+    "    sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))) # open a session which is a envrionment of computation graph.\n",
+    "    sess.run(tf.initialize_all_variables())# initialize the variables\n",
+    "\n",
+    "    # training the MLP\n",
+    "    for i in range(5001): # minibatch iteraction\n",
+    "        batch = mnist.train.next_batch(100) # minibatch size\n",
+    "        sess.run(train_step, feed_dict={x: batch[0], y_target: batch[1]}) # placeholder's none length is replaced by i:i+100 indexes\n",
+    "\n",
+    "        if i%500 == 0:\n",
+    "            train_accuracy = sess.run(accuracy, feed_dict={x:batch[0], y_target: batch[1]})\n",
+    "            print \"step %d, training accuracy: %.3f\"%(i, train_accuracy)\n",
+    "\n",
+    "\n",
+    "\n",
+    "            # calculate the summary and write.\n",
+    "            summary = sess.run(merged, feed_dict={x:batch[0], y_target: batch[1]})\n",
+    "            summary_writer.add_summary(summary , i)\n",
+    "\n",
+    "    # for given x, y_target data set\n",
+    "    print  \"test accuracy: %g\"% sess.run(accuracy, feed_dict={x: mnist.test.images, y_target: mnist.test.labels})\n",
+    "    sess.close()\n",
+    "\n",
+    "MLP()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### TensorBoard 실행하기\n",
+    "위와 같이 코드를 수정했다면, 이제 리눅스 shell로 이동한 후, tensorboard를 실행시킨다.\n",
+    "혹은 IPython에서 new -> terminal을 클릭하여 아래의 명령을 실행할 수도 있다.\n",
+    "\n",
+    "\n",
+    "tensorboard --logdir=/tmp/mlp\n",
+    "\n",
+    "\n",
+    "(만약 위 명령어 실행시 문제가 생기는 경우 다음을 실행)\n",
+    "<br>cd tensorflow/tensorflow/tensorboard\n",
+    "<br>python tensorboard.py --logdir=/tmp/mlp\n",
+    "\n",
+    "\n",
+    "그다음 [docker_default_IP]:6006/#graphs 에 접속하면 아래와 같은 그림을 볼 수 있다.\n",
+    "<br>(ex) http://192.168.99.100:6006/#graphs\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src = \"mlp_total.png\">"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "이번에는 이미지 인식 분야에서 가장 성공적으로 쓰이고 있는 Convolutional Neural Networks를 실습해본다.\n",
+    "\n",
+    "### Convolutional Neural Networks\n",
+    "Convolutional Neural Networks, 이하 CNN은 아래와 같은 Convolutional Layer를 여러층 가진 딥러닝 모델을 뜻한다.\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src = http://ufldl.stanford.edu/tutorial/images/Cnn_layer.png>\n",
+    "(출처: http://ufldl.stanford.edu/tutorial/images/Cnn_layer.png)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "최근에는 아래와 같이 매우 깊은 층으로 Convolutional Layer를 쌓아 매우 방대한 량의 이미지를 학습하는 경우가 많다."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src = https://qph.is.quoracdn.net/main-qimg-cf89aa517e5b641dc8e41e7a57bafc2c?convert_to_webp=true>\n",
+    "(출처: https://qph.is.quoracdn.net/main-qimg-cf89aa517e5b641dc8e41e7a57bafc2c?convert_to_webp=true)\n",
+    "\n",
+    "이번에는 간단한 구조를 가진 CNN을 구현하고 방금전에 사용했던 MNIST 데이터를 학습시켜 보고, MLP와의 성능 차이를 비교해본다.\n",
+    "\n",
+    "아래의 코드를 보면 MLP와 전체 구조는 매우 유사한데, 중간에 Convolutional을 비롯해 처음 보는 여러 연산들이 추가 된 것을 알 수 있다. 또한 CNN을 효과적으로 학습하기 위해서는 Weight의 초기화를 0으로 하는 것이 아니라, 랜덤으로 해주어야하는데, 여기서는 간단히 가우시안을 이용하여 초기화 하였다. 그밖에 dropout과 relu 등이 사용되었다.\n",
+    "\n",
+    "각 함수와 연산들의 자세한 설명은 아래 코드를 보면서 하나하나 분석해보자."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {
+    "collapsed": false,
+    "scrolled": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Extracting MNIST_data/train-images-idx3-ubyte.gz\n",
+      "Extracting MNIST_data/train-labels-idx1-ubyte.gz\n",
+      "Extracting MNIST_data/t10k-images-idx3-ubyte.gz\n",
+      "Extracting MNIST_data/t10k-labels-idx1-ubyte.gz\n",
+      "step 0, training accuracy: 0.070\n",
+      "step 500, training accuracy: 0.980\n",
+      "step 1000, training accuracy: 0.990\n",
+      "step 1500, training accuracy: 0.990\n",
+      "step 2000, training accuracy: 0.980\n",
+      "step 2500, training accuracy: 0.990\n",
+      "step 3000, training accuracy: 1.000\n",
+      "step 3500, training accuracy: 0.990\n",
+      "step 4000, training accuracy: 0.990\n",
+      "step 4500, training accuracy: 0.990\n",
+      "step 5000, training accuracy: 1.000\n",
+      "test accuracy: 0.996\n"
+     ]
+    }
+   ],
+   "source": [
+    "%matplotlib inline\n",
+    "import tensorflow as tf\n",
+    "from tensorflow.examples.tutorials.mnist import input_data\n",
+    "tf.reset_default_graph()\n",
+    "\n",
+    "def CNN():\n",
+    "    # download the mnist data.\n",
+    "    mnist = input_data.read_data_sets('MNIST_data', one_hot=True) \n",
+    "\n",
+    "\n",
+    "    # placeholder is used for feeding data.\n",
+    "    x = tf.placeholder(\"float\", shape=[None, 784], name = 'x') # none represents variable length of dimension. 784 is the dimension of MNIST data.\n",
+    "    y_target = tf.placeholder(\"float\", shape=[None, 10], name = 'y_target') # shape argument is optional, but this is useful to debug.\n",
+    "\n",
+    "\n",
+    "    \n",
+    "    # reshape input data\n",
+    "    x_image = tf.reshape(x, [-1,28,28,1], name=\"x_image\")\n",
+    "    \n",
+    "    # Build a convolutional layer and maxpooling with random initialization\n",
+    "    W_conv1 = tf.Variable(tf.truncated_normal([5, 5, 1, 32], stddev=0.1), name=\"W_conv1\") # W is [row, col, channel, feature]\n",
+    "    b_conv1 = tf.Variable(tf.zeros([32]), name=\"b_conv1\")\n",
+    "    h_conv1 = tf.nn.relu(tf.nn.conv2d(x_image, W_conv1, strides=[1, 1, 1, 1], padding='SAME') + b_conv1, name=\"h_conv1\")\n",
+    "    h_pool1 = tf.nn.max_pool( h_conv1 , ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name = \"h_pool1\")\n",
+    "    \n",
+    "    # Repeat again with 64 number of filters\n",
+    "    W_conv2 = tf.Variable(tf.truncated_normal([5, 5, 32, 64], stddev=0.1), name=\"W_conv2\") # W is [row, col, channel, feature]\n",
+    "    b_conv2 = tf.Variable(tf.zeros([64]), name=\"b_conv2\")\n",
+    "    h_conv2 = tf.nn.relu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1, 1, 1, 1], padding='SAME') + b_conv2, name=\"h_conv2\")\n",
+    "    h_pool2 = tf.nn.max_pool( h_conv2 , ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name = \"h_pool2\")\n",
+    "    \n",
+    "    # Build a fully connected layer\n",
+    "    h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64], name=\"h_pool2_flat\")\n",
+    "    W_fc1 = tf.Variable(tf.truncated_normal([7 * 7 * 64, 1024], stddev=0.1), name = 'W_fc1')\n",
+    "    b_fc1 = tf.Variable(tf.zeros([1024]), name = 'b_fc1')\n",
+    "    h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1, name=\"h_fc1\")\n",
+    "\n",
+    "    \n",
+    "    # Dropout Layer\n",
+    "    keep_prob = tf.placeholder(\"float\", name=\"keep_prob\")\n",
+    "    h_fc1 = tf.nn.dropout(h_fc1, keep_prob, name=\"h_fc1_drop\")\n",
+    "    \n",
+    "    # Build a fully connected layer with softmax \n",
+    "    W_fc2 = tf.Variable(tf.truncated_normal([1024, 10], stddev=0.1), name = 'W_fc2')\n",
+    "    b_fc2 = tf.Variable(tf.zeros([10]), name = 'b_fc2')\n",
+    "    y=tf.nn.softmax(tf.matmul(h_fc1, W_fc2) + b_fc2, name=\"y\")\n",
+    "    \n",
+    "\n",
+    "\n",
+    "\n",
+    "    # define the Loss function\n",
+    "    cross_entropy = -tf.reduce_sum(y_target*tf.log(y), name = 'cross_entropy')\n",
+    "    \n",
+    "\n",
+    "    # define optimization algorithm\n",
+    "    #train_step = tf.train.GradientDescentOptimizer(0.01).minimize(cross_entropy)\n",
+    "    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)\n",
+    "\n",
+    "\n",
+    "\n",
+    "    correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_target, 1))\n",
+    "    # correct_prediction is list of boolean which is the result of comparing(model prediction , data)\n",
+    "\n",
+    "\n",
+    "    accuracy = tf.reduce_mean(tf.cast(correct_prediction, \"float\")) \n",
+    "    # tf.cast() : changes true -> 1 / false -> 0\n",
+    "    # tf.reduce_mean() : calculate the mean\n",
+    "\n",
+    "\n",
+    "\n",
+    "    # create summary of parameters\n",
+    "    tf.histogram_summary('weights_1', W_conv1)\n",
+    "    tf.histogram_summary('weights_2', W_conv2)\n",
+    "    tf.histogram_summary('y', y)\n",
+    "    tf.scalar_summary('cross_entropy', cross_entropy)\n",
+    "    merged = tf.merge_all_summaries()\n",
+    "    summary_writer = tf.train.SummaryWriter(\"/tmp/cnn\")\n",
+    "\n",
+    "    \n",
+    "    # Create Session\n",
+    "    sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth =True)))   # open a session which is a envrionment of computation graph.\n",
+    "    sess.run(tf.initialize_all_variables())# initialize the variables\n",
+    "\n",
+    "\n",
+    "    # training the MLP\n",
+    "    for i in range(5001): # minibatch iteraction\n",
+    "        batch = mnist.train.next_batch(100) # minibatch size\n",
+    "        sess.run(train_step, feed_dict={x: batch[0], y_target: batch[1], keep_prob: 0.5}) # placeholder's none length is replaced by i:i+100 indexes\n",
+    "\n",
+    "        if i%500 == 0:\n",
+    "            train_accuracy = sess.run(accuracy, feed_dict={x:batch[0], y_target: batch[1], keep_prob: 1})\n",
+    "            print \"step %d, training accuracy: %.3f\"%(i, train_accuracy)\n",
+    "\n",
+    "            # calculate the summary and write.\n",
+    "            summary = sess.run(merged, feed_dict={x:batch[0], y_target: batch[1], keep_prob: 1})\n",
+    "            summary_writer.add_summary(summary , i)\n",
+    "\n",
+    "    # for given x, y_target data set\n",
+    "    print  \"test accuracy: %g\"% sess.run(accuracy, feed_dict={x: mnist.test.images[0:250], y_target: mnist.test.labels[0:250], keep_prob: 1})\n",
+    "    sess.close()\n",
+    "CNN()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "학습 결과, MLP보다 훨씬 성능이 높아진 것을 알 수 있고 동시에 학습 속도가 MLP보다 느려진 것을 확인할 수 있다. \n",
+    "\n",
+    "이제 마찬가지로 TensorBoard를 통해서 우리가 만든 Computation Graph를 직접 눈으로 또 확인해보자."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src = \"cnn.png\">"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "지금까지 배운 MLP, CNN과 더불어 Deep Learning에서 쓰이는 가장 강력한 모델로 Recurrent Neural Networks를 빼놓을 수 없다. 마지막으로 이 알고리즘 또한 익혀보자.\n",
+    "\n",
+    "### Recurrent Neural Networks\n",
+    "Recurrent Neural Networks, 이하 RNN는 다음과 같은 구조를 가진 모델이다. RNN은 자기자신을 향하는 weight를 이용해 데이터간의 시간관계를 학습할 수 있다. 이러한 문제들을 시계열 학습이라고 부르며, 기존에 널리 쓰이던 Hidden Markov Model을 뉴럴넷을 이용해 구현했다고 볼 수 있다.\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src  = \"https://raw.githubusercontent.com/peterroelants/peterroelants.github.io/master/notebooks/RNN_implementation/img/SimpleRNN01.png\">\n",
+    "(출처: https://raw.githubusercontent.com/peterroelants/peterroelants.github.io/master/notebooks/RNN_implementation/img/SimpleRNN01.png)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "위의 구조는 1개의 Recurrent weight를 가진 hidden node이다. 이러한 hidden node들이 여러개를 모여 1개의 RNN layer를 형성하고, 이것이 다시 deep 하게 쌓이는 모델 또한 가능하다.(그러나 RNN은 deep 하게 쌓을 경우 학습이 쉽지 않다.)\n",
+    "\n",
+    "RNN의 경우 MLP나 CNN에 비해서 구현이 다소 복잡하다. 따라서 RNN은 skflow 라는 TensorFlow 공식 wrapping library를 활용해서 구현해보자.\n",
+    "\n",
+    "https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/learn/python/learn\n",
+    "\n",
+    "Skflow는 사용자가 최소한의 노력으로, 매우 추상화된 함수들을 사용해 deep learning 모델을 구축하고 학습할 수 있게 도와주는 역할을 한다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "from __future__ import absolute_import\n",
+    "from __future__ import division\n",
+    "from __future__ import print_function\n",
+    "\n",
+    "import numpy as np\n",
+    "from sklearn import metrics\n",
+    "import pandas\n",
+    "\n",
+    "import tensorflow as tf\n",
+    "from tensorflow.contrib import learn\n",
+    "\n",
+    "### Training data\n",
+    "# Downloads, unpacks and reads DBpedia dataset.\n",
+    "dbpedia = learn.datasets.load_dataset('dbpedia')\n",
+    "X_train, y_train = pandas.DataFrame(dbpedia.train.data)[1], pandas.Series(dbpedia.train.target)\n",
+    "X_test, y_test = pandas.DataFrame(dbpedia.test.data)[1], pandas.Series(dbpedia.test.target)\n",
+    "\n",
+    "### Process vocabulary\n",
+    "MAX_DOCUMENT_LENGTH = 10\n",
+    "\n",
+    "vocab_processor = learn.preprocessing.VocabularyProcessor(MAX_DOCUMENT_LENGTH)\n",
+    "X_train = np.array(list(vocab_processor.fit_transform(X_train)))\n",
+    "X_test = np.array(list(vocab_processor.transform(X_test)))\n",
+    "\n",
+    "n_words = len(vocab_processor.vocabulary_)\n",
+    "print('Total words: %d' % n_words)\n",
+    "\n",
+    "### Models\n",
+    "EMBEDDING_SIZE = 50\n",
+    "\n",
+    "# Customized function to transform batched X into embeddings\n",
+    "def input_op_fn(X):\n",
+    "    # Convert indexes of words into embeddings.\n",
+    "    # This creates embeddings matrix of [n_words, EMBEDDING_SIZE] and then\n",
+    "    # maps word indexes of the sequence into [batch_size, sequence_length,\n",
+    "    # EMBEDDING_SIZE].\n",
+    "    word_vectors = learn.ops.categorical_variable(X, n_classes=n_words,\n",
+    "        embedding_size=EMBEDDING_SIZE, name='words')\n",
+    "    # Split into list of embedding per word, while removing doc length dim.\n",
+    "    # word_list results to be a list of tensors [batch_size, EMBEDDING_SIZE].\n",
+    "    word_list = learn.ops.split_squeeze(1, MAX_DOCUMENT_LENGTH, word_vectors)\n",
+    "    return word_list\n",
+    "\n",
+    "# Single direction GRU with a single layer\n",
+    "classifier = learn.TensorFlowRNNClassifier(rnn_size=EMBEDDING_SIZE, \n",
+    "    n_classes=15, cell_type='gru', input_op_fn=input_op_fn,\n",
+    "    num_layers=1, bidirectional=False, sequence_length=None,\n",
+    "    batch_size = 8, steps=1000, optimizer='Adam', learning_rate=0.01, continue_training=True)\n",
+    "\n",
+    "#classifier.sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth =True)))\n",
+    "classifier.sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.05)))\n",
+    "\n",
+    "\n",
+    "# train for 1000 steps & predict on test set.\n",
+    "classifier.fit(X_train, y_train, logdir='/tmp/tf_examples/word_rnn')\n",
+    "score = metrics.accuracy_score(y_test, classifier.predict(X_test))\n",
+    "print('Accuracy: {0:f}'.format(score))\n",
+    "\n",
+    "classifier.sess.close()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Part 2. Deep Reinforcement Learing\n",
+    "\n",
+    "Deep Reinforcement Learning이란, 기존의 강화학습에서 Q function을 딥러닝으로 근사하는 모델을 의미한다. 대표적으로 구글 Deep Mind의 Atari와 최근에 화제가 된 AlphaGo 역시 이 Deep Reinforcement Learning 응용의 한가지이다.\n",
+    "\n",
+    "이번 파트에서는 Deep Reinforcement Learning을 이용해서 간단한 2차원 게임을 플레이하고, reward로 부터 스스로 학습하는 Kaparthy의 오픈소스 예제를 실습해 본다."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img alt=\"Deep RL\" style=\"border-width:0\" width=\"600\" src=\"example.gif?raw=true\" />\n",
+    "\n",
+    "\n",
+    "(출처: https://github.com/nivwusquorum/tensorflow-deepq)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "collapsed": true
+   },
+   "source": [
+    "### Reinforcement Learning\n",
+    "\n",
+    "Reinforcement Learning, 이하 RL은 supervised learning과 달리 데이터에 대한 정확한 정답을 받지 않고, 내가 한 행동에 대한 reward feedback 만으로 학습을 수행하는 알고리즘이다. 이를 강화학습이라 부르며, 이것을 수행하는 가장 대표적인 알고리즘으로 Q-Learning 이 있다.\n",
+    "\n",
+    "RL을 이해하는 것은 매우 많은 공부를 필요로 하기 때문에, 우선 2D게임을 예로 들어 아주 기본적인 개념만 살펴본다.\n",
+    "\n",
+    "* **State**: 게임에서의 각 물체들의 위치, 속도, 벽과의 거리 등을 의미한다.\n",
+    "* **Action**: 게임을 플레이하는 주인공의 행동을 의미한다. 여기서는 4가지 방향에 대한 움직임이 이에 해당한다.\n",
+    "* **Reward**: 게임을 플레이하면서 받는 score. 여기서는 초록색을 먹으면 +1 , 빨간색을 먹으면 -1을 점수로 받는다.\n",
+    "* **Value**: 해당 action 또는 state가 미래에 얼마나 큰 reward를 가져올 지에 대한 예측값.\n",
+    "* **Policy**: 주인공이 현재의 게임 State에서 Reward를 최대한 얻기 위해 Action을 선택하는 전략. 한마디로 [게임을 플레이하는 방법]자체를 의미한다.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "%matplotlib inline\n",
+    "import tensorflow as tf\n",
+    "tf.reset_default_graph()\n",
+    "\n",
+    "from tf_rl.controller import DiscreteDeepQ, HumanController\n",
+    "from tf_rl.simulation import KarpathyGame\n",
+    "from tf_rl import simulate\n",
+    "from tf_rl.models import MLP\n",
+    "\n",
+    "from __future__ import print_function"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Environment Settings\n",
+    "\n",
+    "이제 우리가 원하는 게임 환경을 설정하고, 적절한 reward와 object의 개수 및 observation 을 조절한다"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "current_settings = {\n",
+    "    'objects': [\n",
+    "        'friend',\n",
+    "        'enemy',\n",
+    "    ],\n",
+    "    'colors': {\n",
+    "        'hero':   'yellow',\n",
+    "        'friend': 'green',\n",
+    "        'enemy':  'red',\n",
+    "    },\n",
+    "    'object_reward': {\n",
+    "        'friend': 1,\n",
+    "        'enemy': -1,\n",
+    "    },\n",
+    "    \"num_objects\": {\n",
+    "        'friend' : 25,\n",
+    "        'enemy' :  25,\n",
+    "    },\n",
+    "    \n",
+    "    'hero_bounces_off_walls': False,\n",
+    "    'world_size': (700,500),\n",
+    "    'hero_initial_position': [400, 300],\n",
+    "    'hero_initial_speed':    [0,   0],\n",
+    "    \"maximum_speed\":         [50, 50],\n",
+    "    \"object_radius\": 10.0,\n",
+    "    \"num_observation_lines\" : 32, # the number of antennas\n",
+    "    \"observation_line_length\": 240., # the length of antennas\n",
+    "    \"tolerable_distance_to_wall\": 50, \n",
+    "    \"wall_distance_penalty\":  -0.0, # if the hero is close to wall, that receives penalty\n",
+    "    \"delta_v\": 50 # speed value\n",
+    "}\n",
+    "\n",
+    "# create the game simulator\n",
+    "g = KarpathyGame(current_settings)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Deep Learning Architecture\n",
+    "\n",
+    "이제 Q function을 근사하기 위한 딥러닝 모델을 만들어보자. 이번 예제에서는 위에서 보았던 4층짜리 MLP를 사용한다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "session = tf.InteractiveSession(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth =True)))\n",
+    "\n",
+    "    \n",
+    "\n",
+    "journalist = tf.train.SummaryWriter(\"/tmp/drl\")\n",
+    "\n",
+    "# Brain maps from observation to Q values for different actions.\n",
+    "# Here it is a done using a multi layer perceptron with 2 hidden layers\n",
+    "brain = MLP([g.observation_size,], [200, 200, g.num_actions],  [tf.tanh, tf.tanh, tf.identity])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Make an Agent\n",
+    "\n",
+    "이제 Discrete Deep Q learning 알고리즘이 이 게임을 플레이하면서 학습을 하도록 agent로 설정을 한다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Exception AssertionError: AssertionError() in <bound method InteractiveSession.__del__ of <tensorflow.python.client.session.InteractiveSession object at 0x7f3bc1e87710>> ignored\n"
+     ]
+    }
+   ],
+   "source": [
+    "# The optimizer to use. Here we use RMSProp as recommended by the publication\n",
+    "optimizer = tf.train.RMSPropOptimizer(learning_rate= 0.001, decay=0.9)\n",
+    "\n",
+    "# DiscreteDeepQ object\n",
+    "current_controller = DiscreteDeepQ(g.observation_size, g.num_actions, brain, optimizer, session,\n",
+    "                                   discount_rate=0.99, exploration_period=5000, max_experience=10000, \n",
+    "                                   store_every_nth=4, train_every_nth=4,\n",
+    "                                   summary_writer=journalist)\n",
+    "\n",
+    "session.run(tf.initialize_all_variables())\n",
+    "session.run(current_controller.target_network_update)\n",
+    "#journalist.add_graph(session.graph_def)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Play the Game\n",
+    "\n",
+    "실제로 게임을 플레이하면서 강화학습을 하는 과정을 지켜본다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<?xml version=\"1.0\"?>\n",
+       "\n",
+       "<svg height=\"600\" width=\"720\" >\n",
+       "\n",
+       " <g style=\"fill-opacity:1.0; stroke:black;\n",
+       "\n",
+       "  stroke-width:1;\">\n",
+       "\n",
+       "  <rect x=\"10\" y=\"10\" height=\"500\"\n",
+       "\n",
+       "        width=\"700\" style=\"fill:none;\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"689\" y2=\"102\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"685\" y2=\"149\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"671\" y2=\"194\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"649\" y2=\"235\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"619\" y2=\"272\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"583\" y2=\"301\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"541\" y2=\"324\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"496\" y2=\"337\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"449\" y2=\"342\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"403\" y2=\"337\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"358\" y2=\"324\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"316\" y2=\"301\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"280\" y2=\"272\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"250\" y2=\"235\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"228\" y2=\"194\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"214\" y2=\"149\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"209\" y2=\"102\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"214\" y2=\"55\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"228\" y2=\"10\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"250\" y2=\"-31\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"280\" y2=\"-67\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"316\" y2=\"-97\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"358\" y2=\"-119\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"403\" y2=\"-133\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"449\" y2=\"-137\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"496\" y2=\"-133\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"541\" y2=\"-119\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"583\" y2=\"-97\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"619\" y2=\"-67\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"649\" y2=\"-31\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"671\" y2=\"10\" />\n",
+       "\n",
+       "  <line x1=\"449\" y1=\"102\" x2=\"685\" y2=\"55\" />\n",
+       "\n",
+       "  <circle cx=\"380\" cy=\"344\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"282\" cy=\"481\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"153\" cy=\"255\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"358\" cy=\"369\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"192\" cy=\"270\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"509\" cy=\"282\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"119\" cy=\"100\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"38\" cy=\"21\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"667\" cy=\"137\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"200\" cy=\"446\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"109\" cy=\"383\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"35\" cy=\"199\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"293\" cy=\"110\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"305\" cy=\"175\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"194\" cy=\"369\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"225\" cy=\"475\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"107\" cy=\"232\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"356\" cy=\"41\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"306\" cy=\"481\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"90\" cy=\"185\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"196\" cy=\"342\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"559\" cy=\"127\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"661\" cy=\"307\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"332\" cy=\"373\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"215\" cy=\"441\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"395\" cy=\"498\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"330\" cy=\"435\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"588\" cy=\"370\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"101\" cy=\"114\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"234\" cy=\"261\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"319\" cy=\"489\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"262\" cy=\"324\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"679\" cy=\"454\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"528\" cy=\"127\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"387\" cy=\"304\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"43\" cy=\"323\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"452\" cy=\"480\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"399\" cy=\"302\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"160\" cy=\"321\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"146\" cy=\"401\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"159\" cy=\"397\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"629\" cy=\"417\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"49\" cy=\"29\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"366\" cy=\"341\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"473\" cy=\"474\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"170\" cy=\"402\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"497\" cy=\"182\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"383\" cy=\"447\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"698\" cy=\"233\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:red;\" />\n",
+       "\n",
+       "  <circle cx=\"66\" cy=\"464\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:green;\" />\n",
+       "\n",
+       "  <circle cx=\"449\" cy=\"102\" r=\"10\"\n",
+       "\n",
+       "          style=\"fill:yellow;\" />\n",
+       "\n",
+       "  <text x=\"10\" y=\"535\" font-size=\"15\">\n",
+       "\n",
+       "   fps = 109.4\n",
+       "\n",
+       "  </text>\n",
+       "\n",
+       "  <text x=\"10\" y=\"555\" font-size=\"15\">\n",
+       "\n",
+       "   nearest wall = 82.3\n",
+       "\n",
+       "  </text>\n",
+       "\n",
+       "  <text x=\"10\" y=\"575\" font-size=\"15\">\n",
+       "\n",
+       "   reward       = 0.0\n",
+       "\n",
+       "  </text>\n",
+       "\n",
+       "  <text x=\"10\" y=\"595\" font-size=\"15\">\n",
+       "\n",
+       "   objects eaten => enemy: 6, friend: 9\n",
+       "\n",
+       "  </text>\n",
+       "\n",
+       " </g>\n",
+       "</svg>\n"
+      ],
+      "text/plain": [
+       "<tf_rl.utils.svg.Scene instance at 0x7f3b941680e0>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Interrupted\n"
+     ]
+    }
+   ],
+   "source": [
+    "FPS          = 30\n",
+    "ACTION_EVERY = 3\n",
+    "    \n",
+    "fast_mode = True\n",
+    "if fast_mode:\n",
+    "    WAIT, VISUALIZE_EVERY = False, 20\n",
+    "else:\n",
+    "    WAIT, VISUALIZE_EVERY = True, 1\n",
+    "\n",
+    "    \n",
+    "try:\n",
+    "    with tf.device(\"/gpu:0\"):\n",
+    "        simulate(simulation=g,\n",
+    "                 controller=current_controller,\n",
+    "                 fps=FPS,\n",
+    "                 visualize_every=VISUALIZE_EVERY,\n",
+    "                 action_every=ACTION_EVERY,\n",
+    "                 wait=WAIT,\n",
+    "                 disable_training=False,\n",
+    "                 simulation_resolution=0.001,\n",
+    "                 save_path=None)\n",
+    "except KeyboardInterrupt:\n",
+    "    print(\"Interrupted\")\n",
+    "    \n",
+    "\n",
+    "#session.close()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Applications\n",
+    "* Parameter 들을 바꾸어 enemy와 friend의 개수 차이가 최대한 많이 나도록 agent를 학습시켜본다.\n",
+    "* Boss object를 추가해본다.\n",
+    "* Deep RL에서의 tensorboard를 열어서 visualize를 해본다."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "지금까지 기본적인 Deep Learning 알고리즘들과 기계학습의 한 종류인 강화학습에 대한 예제 코드를 실습해보았다. 이번에는 지금까지 배운 내용을 바탕으로 Polynomial Curve Fitting이라는 여러 기계학습 서적에서 가장 기초적으로 다루는 문제를 직접 구현해본다.\n",
+    "\n",
+    "## Part 3. Polynomial Curve Fitting (Polynomial Regression) 구현\n",
+    "Polynomial curve fitting은 N차 다항함수를 이용해서 주어진 데이터를 잘 연결하는 커브(함수)를 찾는 문제를 말한다.\n",
+    "\n",
+    "아래의 코드는 https://github.com/sjchoi86/Tensorflow-101 에서 공개한 Linear Regression 예제를 가져온 것이다. 이제 주어진 데이터를 가장 잘 학습할 수 있는 모델을 아래 코드를 수정하여 직접 구현해본다."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "%matplotlib inline\n",
+    "import tensorflow as tf\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# Prepare for Linear Regression\n",
+    "\n",
+    "# Parameters \n",
+    "training_epochs = 2000\n",
+    "display_step    = 50\n",
+    "\n",
+    "\n",
+    "# Set TensorFlow Graph\n",
+    "X = tf.placeholder(tf.float32, name=\"input\")\n",
+    "Y = tf.placeholder(tf.float32, name=\"output\")\n",
+    "W = tf.Variable(np.random.randn(), name=\"weight\")\n",
+    "b = tf.Variable(np.random.randn(), name=\"bias\")\n",
+    "\n",
+    "# Construct a Model\n",
+    "activation = tf.add(tf.mul(X, W), b)\n",
+    "\n",
+    "# Define Error Measure and Optimizer\n",
+    "learning_rate   = 0.01\n",
+    "cost = tf.reduce_mean(tf.pow(activation-Y, 2))\n",
+    "# learning_rate   = 0.001\n",
+    "# cost = tf.sqrt(tf.reduce_sum(tf.pow(activation-Y, 2)))\n",
+    "optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(cost) #Gradient descent\n",
+    "\n",
+    "\"\"\"\n",
+    " tf.reduce_sum()\n",
+    " tf.reduce_mean()\n",
+    " _____\n",
+    "\n",
+    " tf.pow(Yhat, Y, 2)\n",
+    " tf.nn.softmax_cross_entropy_with_logits(Yhat, Y)\n",
+    " _____\n",
+    "\n",
+    " tf.train.GradientDescentOptimizer(0.05).minimize(cost)\n",
+    " tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cost)\n",
+    "\"\"\"\n",
+    "\n",
+    "# Initializer\n",
+    "init = tf.initialize_all_variables()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "(\" Type of 'train_X' is \", <type 'numpy.ndarray'>)\n",
+      " Shape of 'train_X' is (1, 20)\n",
+      "(\" Type of 'train_Y' is \", <type 'numpy.ndarray'>)\n",
+      " Shape of 'train_Y' is (1, 20)\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "<matplotlib.legend.Legend at 0x7f62d4a214d0>"
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    },
+    {
+     "data": {
+      "image/png": "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\n+H83g9/CAAAAAElFTkSuQmCC\n",
+      "text/plain": [
+       "<matplotlib.figure.Figure at 0x7f62d6a5b610>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Generate training data\n",
+    "np.random.seed(1)\n",
+    "def f(x, a, b):\n",
+    "    n    = train_X.size\n",
+    "    vals = np.zeros((1, n))\n",
+    "    for i in range(0, n):\n",
+    "        ax  = np.multiply(a, x.item(i))\n",
+    "        val = np.add(ax, b)\n",
+    "        vals[0, i] = val\n",
+    "    return vals\n",
+    "\n",
+    "Wref = 0.7\n",
+    "bref = -1.\n",
+    "n    = 20\n",
+    "noise_var = 0.001\n",
+    "train_X   = np.random.random((1, n)) # 1 * 20 marix\n",
+    "ref_Y     = f(train_X, Wref, bref)\n",
+    "train_Y   = ref_Y + np.sqrt(noise_var)*np.random.randn(1, n)\n",
+    "n_samples = train_X.size # <= Just for using size operator \n",
+    "print (\"\")\n",
+    "print (\" Type of 'train_X' is \", type(train_X))\n",
+    "print (\" Shape of 'train_X' is %s\" % (train_X.shape,))\n",
+    "print (\" Type of 'train_Y' is \", type(train_Y))\n",
+    "print (\" Shape of 'train_Y' is %s\" % (train_Y.shape,))\n",
+    "\n",
+    "# Plot\n",
+    "plt.figure(1)\n",
+    "plt.plot(train_X[0, :], ref_Y[0, :], 'ro', label='Original data')\n",
+    "plt.plot(train_X[0, :], train_Y[0, :], 'bo', label='Training data')\n",
+    "plt.axis('equal')\n",
+    "plt.legend(loc='lower right')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {
+    "collapsed": false,
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('Epoch:', '0001', 'cost=', '0.47523')\n",
+      "(' Wtemp is', '-0.5240', 'btemp is', '0.0690')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0051', 'cost=', '0.01546')\n",
+      "(' Wtemp is', '0.1903', 'btemp is', '-0.8051')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0101', 'cost=', '0.00245')\n",
+      "(' Wtemp is', '0.5134', 'btemp is', '-0.9314')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0151', 'cost=', '0.00081')\n",
+      "(' Wtemp is', '0.6278', 'btemp is', '-0.9762')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0201', 'cost=', '0.00060')\n",
+      "(' Wtemp is', '0.6683', 'btemp is', '-0.9920')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0251', 'cost=', '0.00057')\n",
+      "(' Wtemp is', '0.6826', 'btemp is', '-0.9976')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0301', 'cost=', '0.00057')\n",
+      "(' Wtemp is', '0.6877', 'btemp is', '-0.9996')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0351', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6895', 'btemp is', '-1.0003')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0401', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6902', 'btemp is', '-1.0006')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0451', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6904', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0501', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0551', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0601', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0651', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0701', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0751', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0801', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0851', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0901', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '0951', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1001', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1051', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1101', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1151', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1201', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1251', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1301', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1351', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1401', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1451', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1501', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1551', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1601', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1651', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1701', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1751', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1801', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1851', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1901', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n",
+      "('Epoch:', '1951', 'cost=', '0.00056')\n",
+      "(' Wtemp is', '0.6905', 'btemp is', '-1.0007')\n",
+      "(' Wref is', '0.7000', 'bref is', '-1.0000')\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Run! \n",
+    "sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth =True)))\n",
+    "# Initialize\n",
+    "sess.run(init)    \n",
+    "for epoch in range(training_epochs):\n",
+    "    for (x, y) in zip(train_X[0, :], train_Y[0, :]):\n",
+    "        # print \"x: \", x, \" y: \", y\n",
+    "        sess.run(optimizer, feed_dict={X:x, Y:y})\n",
+    "    \n",
+    "    # Check cost\n",
+    "    if epoch % display_step == 0:\n",
+    "        costval = sess.run(cost, feed_dict={X: train_X, Y:train_Y})\n",
+    "        print (\"Epoch:\", \"%04d\"%(epoch+1), \"cost=\", \"{:.5f}\".format(costval))\n",
+    "        Wtemp = sess.run(W)\n",
+    "        btemp = sess.run(b)\n",
+    "        print (\" Wtemp is\", \"{:.4f}\".format(Wtemp), \"btemp is\", \"{:.4f}\".format(btemp))\n",
+    "        print (\" Wref is\", \"{:.4f}\".format(Wref), \"bref is\", \"{:.4f}\".format(bref))\n",
+    "        \n",
+    "# Final W and b\n",
+    "Wopt = sess.run(W)\n",
+    "bopt = sess.run(b)\n",
+    "fopt = f(train_X, Wopt, bopt)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "<matplotlib.legend.Legend at 0x7f62cc04d890>"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    },
+    {
+     "data": {
+      "image/png": "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\niIiI4NJLL2XgwIF8++23/PKXv+SKK67Q8yQnJzN9+nTWrVtHVlZrXYKwd+9evvrqK9auXUt4eDjX\nXHMN48ePt7n2nXfeaXP9Z599lsrKSmJiYuyW86abbtK3J0+ezGOPPcamTZv0n4M9xcXFFBcXt1pW\naDu4t7Yc/WG0wH8I6AX87CDfPy1fAI8Cex2d0Dq4C+dsLS9vNtdn05unR9jtTL/32hbHtGxnHw4M\n59JLc1m9Otf9hRQ+URcRYXd/fWSk186RkJDA0aNHaWhoaBHgDx48yFlnNU1vcc455zg8z4EDB2xe\n79q1Kz179mz12klJTfXSqKgoTp48CcAPP/zA//zP//D1119z6tQp6urqGDRoUJv3cuDAAeLi4uja\ntau+Lzk5mZ9++gnQ+glmz57Nu+++y5EjR/T7PXr0qB7cm3v99dd55pln9JlXq6qqKCsra7UczSu+\njzzyiN18rnSorgKmWbanASsd5Dvb8r0fcAOwzIVrBjSTqYS0tDkYjblOjTc3GAz8e6s2gUAhUEA0\naQyml2EkfWKuZdbsy3kwd2aL4yIi6uyeLzJSOrECSWpmJrNTbMcvZKekMDojw8ER7j/HVVddRURE\nBO+9957N/qqqKlavXs211zZVPlqbO6V3797s27dPT58+fbrNIOjIPffcw0UXXcTOnTupqKhg4cKF\nNDQ4bFDQ9erVi/Lyck6dOqXv27Nnj17uZcuWsWrVKj799FMqKirYvXs30FRbb35/e/bsYfr06fz9\n73/n2LFjlJeXc/HFF7ttjiBXxrk/DrwD3A2Ugj4xSW9gCZBuSb8L9ATOAH8BTrhwzYBlMpWQlbXG\nqrnE8Xjzb7/9lssvv1xPrysooCg/n9DqagZHRpKdkcHw9HQcycxMxWyebXOtlJRsMjLGuOt2RCfQ\n+B6Ya3lv1EdGMqaN94a7z9G9e3dycnLIyMggNjaWkSNHsn//fv7yl7/Qt29fpkyZ4tR5Jk2axFVX\nXcX69ev59a9/TW5uboeDYFVVFTExMURFRbFjxw6ef/55zj777DaPS05OZtCgQeTk5PDoo4+yceNG\nCgoKuP766/XzRkREEB8fz8mTJ8nOzrY5PjExkV27dunpkydPYjAYSEhIoKGhgddff51t27Z16J7s\ncSW4HwNG2dl/gKbADk2NuqIVtu3gGrN5Ifn5c22Cu/V//6eeeor7778fk6mETWoQNYQRoeoYgv2P\n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\ngg==\n",
+      "text/plain": [
+       "<matplotlib.figure.Figure at 0x7f62d6bd5bd0>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Plot Results\n",
+    "plt.figure(2)\n",
+    "plt.plot(train_X[0, :], ref_Y[0, :], 'ro', label='Original data')\n",
+    "plt.plot(train_X[0, :], train_Y[0, :], 'bo', label='Training data')\n",
+    "plt.plot(train_X[0, :], fopt[0, :], 'k-', label='Fitted Line')\n",
+    "plt.axis('equal')\n",
+    "plt.legend(loc='lower right')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## * Open-source TensorFlow Implementation\n",
+    "\n",
+    "아래 링크는 최신 연구들을 TensorFlow로 구현해놓은 오픈소스 프로젝트들을 모아서 정리해 둔 페이지이다. 이중 본인의 연구 분야와 관련있는 프로젝트를 clone, 수정하여 사용할 경우 개발시간을 크게 시간을 단축시킬 수 있다.\n",
+    "\n",
+    "\n",
+    "https://github.com/TensorFlowKR/awesome_tensorflow_implementations\n",
+    "\n",
+    "유명한 오픈소스 몇가지 살펴보자."
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 2",
+   "language": "python",
+   "name": "python2"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 2
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython2",
+   "version": "2.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 0
+}
