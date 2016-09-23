@@ -1,0 +1,172 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "https://www.tensorflow.org/versions/r0.10/tutorials/word2vec/index.html#motivation-why-learn-word-embeddings\n",
+    "와따 워드임베딩 다있네 여기\n",
+    "\n",
+    "\n",
+    "\n",
+    "\n",
+    "### Recurrent Neural Networks\n",
+    "Recurrent Neural Networks, 이하 RNN는 다음과 같은 구조를 가진 모델이다. RNN은 자기자신을 향하는 weight를 이용해 데이터간의 시간관계를 학습할 수 있다. 이러한 문제들을 시계열 학습이라고 부르며, 기존에 널리 쓰이던 Hidden Markov Model을 뉴럴넷을 이용해 구현했다고 볼 수 있다.\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src  = \"SimpleRNN01.png\">\n",
+    "(출처: https://raw.githubusercontent.com/peterroelants/peterroelants.github.io/master/notebooks/RNN_implementation/img/SimpleRNN01.png)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "위의 구조는 1개의 Recurrent weight를 가진 hidden node이다. 이러한 hidden node들이 여러개를 모여 1개의 RNN layer를 형성하고, 이것이 다시 deep 하게 쌓이는 모델 또한 가능하다.(그러나 RNN은 deep 하게 쌓을 경우 학습이 쉽지 않다.)\n",
+    "\n",
+    "RNN의 경우 MLP나 CNN에 비해서 구현이 다소 복잡하다. 따라서 RNN은 skflow 라는 TensorFlow 공식 wrapping library를 활용해서 구현해보자.\n",
+    "\n",
+    "https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/learn/python/learn\n",
+    "\n",
+    "Skflow는 사용자가 최소한의 노력으로, 매우 추상화된 함수들을 사용해 deep learning 모델을 구축하고 학습할 수 있게 도와주는 역할을 한다.\n",
+    "\n",
+    "\n",
+    "<br>아래의 예제 코드를 실행시키기 위해서는 리눅스 shell에서 다음의 명령어를 실행해 필요한 python package를 설치해야한다.\n",
+    "####### pip install pandas"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src  = \"word_embedding.png\" width='600'>\n",
+    "(출처: http://sebastianruder.com/word-embeddings-1/)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "WARNING:tensorflow:Using temporary folder as model directory: /tmp/tmpnzKWsC\n",
+      "WARNING:tensorflow:Using temporary folder as model directory: /tmp/tmpnzKWsC\n",
+      "WARNING:tensorflow:Using default config.\n",
+      "WARNING:tensorflow:Using default config.\n",
+      "WARNING:tensorflow:Setting feature info to TensorSignature(dtype=tf.int64, shape=TensorShape([Dimension(None), Dimension(10)]), is_sparse=False)\n",
+      "WARNING:tensorflow:Setting feature info to TensorSignature(dtype=tf.int64, shape=TensorShape([Dimension(None), Dimension(10)]), is_sparse=False)\n",
+      "WARNING:tensorflow:Setting targets info to TensorSignature(dtype=tf.float32, shape=TensorShape([Dimension(None), Dimension(15)]), is_sparse=False)\n",
+      "WARNING:tensorflow:Setting targets info to TensorSignature(dtype=tf.float32, shape=TensorShape([Dimension(None), Dimension(15)]), is_sparse=False)\n",
+      "WARNING:tensorflow:split_squeeze (from tensorflow.contrib.learn.python.learn.ops.array_ops) is deprecated and will be removed after 2016-08-01.\n",
+      "Instructions for updating:\n",
+      "Please use tf.unpack instead.\n",
+      "WARNING:tensorflow:split_squeeze (from tensorflow.contrib.learn.python.learn.ops.array_ops) is deprecated and will be removed after 2016-08-01.\n",
+      "Instructions for updating:\n",
+      "Please use tf.unpack instead.\n",
+      "WARNING:tensorflow:split_squeeze (from tensorflow.contrib.learn.python.learn.ops.array_ops) is deprecated and will be removed after 2016-08-01.\n",
+      "Instructions for updating:\n",
+      "Please use tf.unpack instead.\n",
+      "WARNING:tensorflow:split_squeeze (from tensorflow.contrib.learn.python.learn.ops.array_ops) is deprecated and will be removed after 2016-08-01.\n",
+      "Instructions for updating:\n",
+      "Please use tf.unpack instead.\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Total words: 7664\n",
+      "Accuracy: 0.485714\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np\n",
+    "from sklearn import metrics\n",
+    "import pandas\n",
+    "\n",
+    "import tensorflow as tf\n",
+    "from tensorflow.contrib import learn\n",
+    "\n",
+    "### Downloads Training data, unpacks and reads DBpedia dataset.\n",
+    "dbpedia = learn.datasets.load_dataset('dbpedia')\n",
+    "X_train, y_train = pandas.DataFrame(dbpedia.train.data)[1], pandas.Series(dbpedia.train.target)\n",
+    "X_test, y_test = pandas.DataFrame(dbpedia.test.data)[1], pandas.Series(dbpedia.test.target)\n",
+    "\n",
+    "### Process vocabulary\n",
+    "MAX_DOCUMENT_LENGTH = 10\n",
+    "\n",
+    "vocab_processor = learn.preprocessing.VocabularyProcessor(MAX_DOCUMENT_LENGTH)\n",
+    "X_train = np.array(list(vocab_processor.fit_transform(X_train)))\n",
+    "X_test = np.array(list(vocab_processor.transform(X_test)))\n",
+    "\n",
+    "n_words = len(vocab_processor.vocabulary_)\n",
+    "print('Total words: %d' % n_words)\n",
+    "\n",
+    "### Models\n",
+    "EMBEDDING_SIZE = 50\n",
+    "\n",
+    "# Customized function to transform batched X into embeddings\n",
+    "def input_op_fn(X):\n",
+    "    # Convert indexes of words into embeddings.\n",
+    "    # This creates embeddings matrix of [n_words, EMBEDDING_SIZE] and then\n",
+    "    # maps word indexes of the sequence into [batch_size, sequence_length,\n",
+    "    # EMBEDDING_SIZE].\n",
+    "    word_vectors = learn.ops.categorical_variable(X, n_classes=n_words,\n",
+    "        embedding_size=EMBEDDING_SIZE, name='words')\n",
+    "    # Split into list of embedding per word, while removing doc length dim.\n",
+    "    # word_list results to be a list of tensors [batch_size, EMBEDDING_SIZE].\n",
+    "    word_list = learn.ops.split_squeeze(1, MAX_DOCUMENT_LENGTH, word_vectors)\n",
+    "    return word_list\n",
+    "\n",
+    "# Single direction GRU with a single layer\n",
+    "classifier = learn.TensorFlowRNNClassifier(rnn_size=EMBEDDING_SIZE, \n",
+    "    n_classes=15, cell_type='gru', input_op_fn=input_op_fn,\n",
+    "    num_layers=1, bidirectional=False, sequence_length=None,\n",
+    "    batch_size = 32, steps=1000, optimizer='Adam', learning_rate=0.01, continue_training=True)\n",
+    "\n",
+    "classifier.sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth =True)))\n",
+    "\n",
+    "\n",
+    "# train for 1000 steps & predict on test set.\n",
+    "classifier.fit(X_train, y_train, logdir='/tmp/tf_examples/word_rnn')\n",
+    "score = metrics.accuracy_score(y_test, classifier.predict(X_test))\n",
+    "print('Accuracy: {0:f}'.format(score))\n",
+    "\n",
+    "classifier.sess.close()"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 2",
+   "language": "python",
+   "name": "python2"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 2
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython2",
+   "version": "2.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 0
+}

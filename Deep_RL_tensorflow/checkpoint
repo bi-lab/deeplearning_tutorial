@@ -1,0 +1,3 @@
+model_checkpoint_path: "Checkpoint\\500_save"
+all_model_checkpoint_paths: "Checkpoint\\0_save"
+all_model_checkpoint_paths: "Checkpoint\\500_save"
