@@ -120,7 +120,7 @@ class DiscreteDeepQ(object):
         with tf.name_scope("taking_action"):
             self.observation        = tf.placeholder(tf.float32, (None, self.observation_size), name="observation")
             self.action_scores      = tf.identity(self.q_network(self.observation), name="action_scores")
-            tf.histogram_summary("action_scores", self.action_scores)
+            tf.summary.histogram("action_scores", self.action_scores)
             self.predicted_actions  = tf.argmax(self.action_scores, dimension=1, name="predicted_actions")
 
         with tf.name_scope("estimating_future_rewards"):
@@ -128,7 +128,7 @@ class DiscreteDeepQ(object):
             self.next_observation          = tf.placeholder(tf.float32, (None, self.observation_size), name="next_observation")
             self.next_observation_mask     = tf.placeholder(tf.float32, (None,), name="next_observation_mask")
             self.next_action_scores        = tf.stop_gradient(self.target_q_network(self.next_observation))
-            tf.histogram_summary("target_action_scores", self.next_action_scores)
+            tf.summary.histogram("target_action_scores", self.next_action_scores)
             self.rewards                   = tf.placeholder(tf.float32, (None,), name="rewards")
             target_values                  = tf.reduce_max(self.next_action_scores, reduction_indices=[1,]) * self.next_observation_mask
             self.future_rewards            = self.rewards + self.discount_rate * target_values
@@ -145,10 +145,10 @@ class DiscreteDeepQ(object):
                     gradients[i] = (tf.clip_by_norm(grad, 5), var)
             # Add histograms for gradients.
             for grad, var in gradients:
-                tf.histogram_summary(var.name, var)
+                tf.summary.histogram(var.name, var)
                 #if grad:
                 if grad is not None:
-                    tf.histogram_summary(var.name + '/gradients', grad)
+                    tf.summary.histogram(var.name + '/gradients', grad)
             self.train_op                   = self.optimizer.apply_gradients(gradients)
 
         # UPDATE TARGET NETWORK
@@ -161,9 +161,9 @@ class DiscreteDeepQ(object):
             self.target_network_update = tf.group(*self.target_network_update)
 
         # summaries
-        tf.scalar_summary("prediction_error", self.prediction_error)
+        tf.summary.scalar("prediction_error", self.prediction_error)
 
-        self.summarize = tf.merge_all_summaries()
+        self.summarize = tf.summary.merge_all()
         self.no_op1    = tf.no_op()
 
     def action(self, observation):
